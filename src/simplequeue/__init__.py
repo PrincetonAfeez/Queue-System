@@ -1,6 +1,6 @@
 """Durable SQLite-backed queue library."""
 
-__version__ = "0.2.0"  # keep in sync with pyproject.toml [project].version
+__version__ = "0.2.1"  # keep in sync with pyproject.toml [project].version
 
 from simplequeue.cache.stats_cache import StatsCache, shared_stats_cache
 from simplequeue.config import QueueConfig, validate_library_config
