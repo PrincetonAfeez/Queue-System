@@ -104,11 +104,12 @@ class Queue:
             timeout = visibility_timeout
         else:
             timeout_seconds = visibility_timeout
-            if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
-                raise ValueError("visibility_timeout must be a finite number > 0")
-            timeout = timedelta(seconds=visibility_timeout)
         if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise ValueError("visibility_timeout must be a finite number > 0")
+        if isinstance(visibility_timeout, timedelta):
+            timeout = visibility_timeout
+        else:
+            timeout = timedelta(seconds=visibility_timeout)
         mode = DeliveryMode.parse(delivery_mode)
         claim = self.backend.claim_next(
             self.queue_name,
