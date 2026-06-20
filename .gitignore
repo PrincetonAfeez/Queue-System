@@ -14,10 +14,12 @@ dist/
 *.egg-info/
 *.egg
 
-# Test / type-check caches
+# Test / type-check / lint caches
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
 .hypothesis/
 
@@ -26,10 +28,17 @@ htmlcov/
 *.db-journal
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite3
+
+# Local config overrides (keep committed examples out of git)
+queue.local.toml
+queue.local.json
 
 # IDE / editor
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 .claude/
@@ -37,6 +46,9 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log
 
 # Project scope documents (local planning)
 queue_system_scope.txt
