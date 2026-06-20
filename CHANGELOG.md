@@ -8,8 +8,29 @@ version is `0.x`, the public API may change between releases.
 ## [Unreleased]
 
 ### Added
+- `simplequeue purge` CLI for terminal row maintenance (`--older-than-days`, `--include-dead-lettered`).
+- `Queue.purge_terminal(include_dead_lettered=True)` and 7-day default retention when `older_than` is omitted.
+- `create_backend` exported from top-level `simplequeue`; schema errors raise `StorageError`.
+- `docs/migrations.md` for schema upgrade policy and idempotency retry notes.
+- `tests/unit/test_round2_fixes.py` for Round 2 regression coverage.
+
+### Changed
+- `create_backend()` ignores invalid `max_attempts` in config (uses library default 3).
+- `list_dead_letters(all_queues=True, queue_name=...)` raises `ValueError`.
+- `shared_stats_cache()` keyed by `(path, ttl, id(clock))`.
+- Config validates `queue_name`; `cache_ttl` / `max_attempts` scoped by command.
+- Consume warning clarifies lease reclaim requires active dequeuers without `--sweeper`.
+- README coverage figure updated to ~96%.
+
+### Fixed
+- `init-db` with `max_attempts = 0` in config no longer fails at backend construction.
+- `purge_terminal()` no longer deletes all terminal rows when `older_than` is omitted.
+- Unclosed SQLite connection in schema version test (ResourceWarning).
+
+## [Unreleased — Round 1]
+
+### Added
 - `Queue.purge_terminal()` to delete old `acked`/`deleted` rows and cap database growth.
-- `Queue.list_dead_letters(all_queues=True)` for database-wide DLQ listing.
 - `create_backend()` factory and `schema_meta` version tracking.
 - GitHub Actions CI (pytest, mypy, ruff) and `ruff` in dev dependencies.
 - `tests/unit/test_implemented_fixes.py` covering validation, cross-queue lease release, and purge.
