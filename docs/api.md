@@ -49,6 +49,14 @@ from a ``QueueConfig``.
 When ``stats_cache`` is supplied to ``Queue(...)``, ``cache_ttl_seconds`` is
 ignored (the injected cache owns TTL semantics).
 
+## Input bounds
+
+- ``queue_name`` — non-empty, trimmed, at most 256 characters.
+- Timing fields (``visibility_timeout``, ``poll_interval``, ``cache_ttl``, etc.)
+  must be finite; positive where enforced by validation helpers.
+- Payloads and idempotency keys are stored as JSON/SQLite text with no library-level
+  max length; very large values are limited by SQLite and filesystem constraints.
+
 ## `list_dead_letters`
 
 - ``list_dead_letters()`` — dead letters for this queue instance's name.
