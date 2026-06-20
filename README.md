@@ -20,7 +20,7 @@ python -m mypy src
 ruff check src tests
 ```
 
-With dev dependencies installed, generate a coverage report (currently **~97%** line
+With dev dependencies installed, generate a coverage report (currently **~96%** line
 coverage on `src/simplequeue`):
 
 ```powershell
@@ -139,7 +139,7 @@ The CLI always uses wall-clock time (`SystemClock`). Inject `FakeClock` through
 | 2 | usage or configuration error (bad arguments, invalid config file) |
 | 3 | `inspect` target message not found (or wrong queue scope) |
 | 4 | domain error (`QueueError`, including `IdempotencyConflict` and duplicate sweeper) |
-| 130 | interrupted (Ctrl-C or SIGTERM on Unix; Ctrl-C on Windows) |
+| 130 | interrupted (Ctrl-C; SIGTERM on Unix maps to the same cleanup path) |
 
 ## Python API
 
@@ -324,7 +324,7 @@ demos always ignore `--db` and run in isolated teaching setups.
 ## Limitations
 
 - **Single SQLite writer** — throughput is capped by database-level write locks; see [docs/sqlite_atomic_claims.md](docs/sqlite_atomic_claims.md).
-- **Terminal row retention** — `acked` and `deleted` messages remain in the database until you call `Queue.purge_terminal()`. `dead_lettered` rows are kept for inspection and DLQ tooling.
+- **Terminal row retention** — `acked` and `deleted` messages remain until you call `Queue.purge_terminal()` or `simplequeue purge`. By default the library keeps the last 7 days; pass `older_than` explicitly for custom retention. Use `--include-dead-lettered` / `include_dead_lettered=True` to prune old DLQ rows.
 - **No network layer** — local library and CLI only; see Security below.
 
 ## Security
