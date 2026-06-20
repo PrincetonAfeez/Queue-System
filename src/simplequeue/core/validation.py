@@ -19,19 +19,19 @@ def validate_queue_name(name: str) -> str:
 
 def require_finite(value: float, *, field: str) -> None:
     if not math.isfinite(value):
-        raise ValueError(f"config value for {field!r} must be a finite number")
+        raise ValueError(f"{field!r} must be a finite number")
 
 
 def require_finite_positive(value: float, *, field: str) -> None:
     require_finite(value, field=field)
     if value <= 0:
-        raise ValueError(f"config value for {field!r} must be > 0")
+        raise ValueError(f"{field!r} must be > 0")
 
 
 def require_finite_non_negative(value: float, *, field: str) -> None:
     require_finite(value, field=field)
     if value < 0:
-        raise ValueError(f"config value for {field!r} must be >= 0")
+        raise ValueError(f"{field!r} must be >= 0")
 
 
 def validate_join_timeout(timeout: float | None, *, field: str = "join_timeout") -> None:
