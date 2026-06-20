@@ -54,3 +54,20 @@ queue API, and the workers so written events and stats keys cannot diverge.
 Stats are computed from backend state and event counts using the injected clock
 for the "recent" window, then optionally cached by `StatsCache`. Structured log
 messages mirror important lifecycle events for demos and local debugging.
+
+## Storage factory and schema versioning
+
+`create_backend()` in `simplequeue.storage.factory` builds a `StorageBackend`
+from `QueueConfig` (SQLite today). ``create_queue()`` builds a full ``Queue``
+with stats-cache TTL and validated config. ``init_schema()`` runs ``schema.sql``
+and records the version in ``schema_meta``; see [migrations.md](migrations.md)
+for upgrade policy. Opening a database with a newer schema than the library
+raises `StorageError`.
+
+## Maintenance
+
+`Queue.purge_terminal()` removes old terminal rows (and optionally dead-letter
+records) on a retention cutoff. The CLI exposes this as `simplequeue purge`
+(with `--all-queues`, `--older-than`, and `--older-than-days`). `Queue.sweep()`
+reclaims expired leases and moves exhausted messages to the DLQ across the whole
+database file.

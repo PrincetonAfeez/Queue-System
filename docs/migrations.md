@@ -15,7 +15,9 @@ library release that changes ``schema.sql`` should bump ``SCHEMA_VERSION`` in
 
 ## Idempotency concurrency
 
-Concurrent ``enqueue`` calls with the same idempotency key retry the insert up
-to ``IDEMPOTENCY_ENQUEUE_MAX_RETRIES`` (25) times before raising
-``StorageError``. Under extreme contention, backoff at the caller or a short
-sleep between retries may still be needed for pathological load tests.
+Concurrent ``enqueue`` calls with the same idempotency key use ``INSERT OR
+IGNORE`` plus a follow-up select on the live row. A bounded retry loop
+(``IDEMPOTENCY_ENQUEUE_MAX_RETRIES``, 25) remains for races where the unique
+index blocks on a terminal row or concurrent writers interleave. Under extreme
+contention, backoff at the caller may still be needed for pathological load
+tests.

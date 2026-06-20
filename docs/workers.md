@@ -6,10 +6,10 @@
 invoke a `Processor`, and call `ack()` / `nack()` in at-least-once mode.
 
 ```python
-from simplequeue import Queue, SQLiteBackend, WorkerPool, BackgroundSweeper, ShutdownMode
+from simplequeue import BackgroundSweeper, QueueConfig, ShutdownMode, WorkerPool, create_queue
 
-backend = SQLiteBackend("queue.db")
-queue = Queue(backend, "jobs")
+config = QueueConfig(database_path="queue.db")
+queue = create_queue(config, "jobs")
 queue.init_schema()
 
 def handle(delivery):

@@ -23,7 +23,31 @@ Public exports from `simplequeue` (`__all__`):
 | `DeadLetterNotFound` | Invalid DLQ requeue target |
 | `StorageError` | Backend / serialization failures |
 | `payload_idempotency_key` | Derive key from payload hash |
-| `create_backend` | Build a `StorageBackend` from `QueueConfig` (exported from `simplequeue`) |
+| `create_backend` / `create_queue` | Build storage / queue from `QueueConfig` (exported from `simplequeue`) |
+| `validate_library_config` | Validate a `QueueConfig` for library factory entry points |
+
+## `Queue` constructor
+
+``Queue(backend, queue_name, *, clock=None, stats_cache=None, cache_ttl_seconds=1.0, logger=None)``
+
+- ``clock`` — inject ``FakeClock`` in tests; defaults to ``SystemClock``.
+- ``stats_cache`` — optional shared ``StatsCache``; when omitted, SQLite backends
+  use ``shared_stats_cache(db_path, ttl_seconds=cache_ttl_seconds, clock=clock)``.
+- ``cache_ttl_seconds`` — TTL for auto-created stats caches (must be finite and
+  ``> 0``); ignored when ``stats_cache`` is supplied.
+
+Prefer ``create_queue(config)`` when building from ``QueueConfig``.
+
+## `validate_library_config`
+
+``validate_library_config(config)`` checks queue name, finite positive timing
+fields, and ``worker_count >= 1``. Unlike CLI command-scoped validation,
+``max_attempts < 1`` is allowed (``create_backend()`` clamps it). ``create_queue``
+calls this automatically; use it directly when constructing ``Queue`` manually
+from a ``QueueConfig``.
+
+When ``stats_cache`` is supplied to ``Queue(...)``, ``cache_ttl_seconds`` is
+ignored (the injected cache owns TTL semantics).
 
 ## `list_dead_letters`
 
@@ -33,15 +57,30 @@ Public exports from `simplequeue` (`__all__`):
 
 Passing both ``queue_name`` and ``all_queues=True`` raises ``ValueError``.
 
+CLI: ``simplequeue dlq --all-queues`` lists unrequeued dead letters across the
+whole database. Do not combine ``--queue`` and ``--all-queues``.
+
+## `create_queue`
+
+``create_queue(config, queue_name=None, *, clock=None, stats_cache=None)`` builds a
+``Queue`` with ``create_backend(config)``, wires ``config.cache_ttl`` into
+``shared_stats_cache``, and validates the queue name. Prefer this over manual
+``Queue(create_backend(...), ...)`` when using ``QueueConfig``.
+
 ## `purge_terminal`
 
 ``Queue.purge_terminal(older_than=...)`` deletes terminal rows on or before the
 cutoff. When ``older_than`` is omitted, the default retention is
 ``DEFAULT_PURGE_RETENTION_DAYS`` (7 days) relative to the queue clock.
 
+Pass ``all_queues=True`` to purge every queue in the database file (mutually
+exclusive with an explicit ``queue_name``).
+
 Set ``include_dead_lettered=True`` to also remove old ``dead_lettered`` rows and
 their ``dead_letters`` records. CLI: ``simplequeue purge --older-than-days 7
---include-dead-lettered``.
+--include-dead-lettered``. Use ``--older-than-days 0`` or ``--older-than
+2026-01-01T00:00:00+00:00`` for an explicit cutoff; ``--all-queues`` purges every
+queue in the database file.
 
 ## `shared_stats_cache`
 
