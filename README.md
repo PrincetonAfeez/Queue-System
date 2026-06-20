@@ -1,8 +1,21 @@
 # Queue System Library
 
+[![CI](https://github.com/PrincetonAfeez/Queue-System/actions/workflows/ci.yml/badge.svg)](https://github.com/PrincetonAfeez/Queue-System/actions/workflows/ci.yml)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+![Version](https://img.shields.io/badge/version-0.2.1-green)
+![Tests](https://img.shields.io/badge/tests-566-blue)
+![Coverage](https://img.shields.io/badge/coverage-%7E99%25-brightgreen)
+
 A durable SQLite-backed queue library and CLI that demonstrates at-most-once delivery, at-least-once delivery, worker pools, visibility timeouts, retries, dead-letter handling, stats caching, and operational inspection.
 
 The library and CLI are the product. The database is the source of truth for queue correctness; caching and CLI displays are read-side conveniences only.
+
+## Design decisions
+
+- **SQLite + `BEGIN IMMEDIATE`** — single-writer durability with guarded updates instead of row-level locks; appropriate for an academic/local queue.
+- **Partial idempotency index** — uniqueness applies to live (`available`/`leased`) rows only, so keys become reusable after terminal ack/DLQ.
+- **Ack/nack return results** — stale receipts and races surface as `success=False` with a `reason`, not exceptions, so workers can log and continue.
+- **`create_queue(config)`** — library entry point wires backend, stats-cache TTL, and validated config in one call.
 
 ## Setup
 
@@ -20,7 +33,10 @@ python -m mypy src
 ruff check src tests
 ```
 
-With dev dependencies installed, generate a coverage report (currently **~96%** line
+The suite currently collects **566 tests** across unit, integration, CLI smoke,
+worker, and concurrency modules.
+
+With dev dependencies installed, generate a coverage report (currently **~99%** line
 coverage on `src/simplequeue`):
 
 ```powershell
@@ -41,7 +57,7 @@ The suite lives under `tests/` and is organized by concern:
 
 | Directory | Focus |
 | --------- | ----- |
-| `tests/unit/` | Config, serializers, cache, clock, CLI handlers, queue/worker validation |
+| `tests/unit/` | Config, serializers, cache, clock, CLI handlers, module inventory, maximum coverage |
 | `tests/integration/` | End-to-end queue semantics, regressions, backend edge cases |
 | `tests/cli/` | Subprocess smoke tests for the `simplequeue` entry point |
 | `tests/workers/` | Worker pools, shutdown modes, background sweeper |
@@ -49,7 +65,8 @@ The suite lives under `tests/` and is organized by concern:
 | `tests/teaching/` | Unsafe examples that demonstrate known failure modes |
 
 Shared fixtures (including a `queue_factory` for SQLite-backed queues) are in
-`tests/conftest.py`. Run `pytest --co -q` to list all collected tests.
+`tests/conftest.py`. Run `pytest --co -q` to list all collected tests (566 at
+last count).
 
 ## CLI Quick Start
 
@@ -78,6 +95,9 @@ simplequeue consume `
 simplequeue stats --db queue.db --queue emails --no-cache
 simplequeue peek --db queue.db --queue emails --limit 10
 simplequeue list-queues --db queue.db
+simplequeue sweep --db queue.db --queue emails
+simplequeue dlq --db queue.db --queue emails
+simplequeue purge --db queue.db --queue emails --older-than-days 7
 ```
 
 Every command supports `--help`, which lists all flags. The `consume` and
@@ -149,14 +169,14 @@ See [docs/api.md](docs/api.md) for the full public surface. Core usage:
 from simplequeue import (
     BackgroundSweeper,
     DeliveryMode,
-    Queue,
+    QueueConfig,
     ShutdownMode,
-    SQLiteBackend,
     WorkerPool,
+    create_queue,
 )
 
-backend = SQLiteBackend("queue.db")
-queue = Queue(backend, "emails")
+config = QueueConfig(database_path="queue.db", cache_ttl=2.0)
+queue = create_queue(config, "emails")
 queue.init_schema()
 
 queue.enqueue({"to": "user@example.com"}, max_attempts=3)
@@ -294,10 +314,11 @@ queue's injected clock. Mutations invalidate the relevant entry (a sweep clears
 all entries because it spans queues), but cached stats are still a read-side
 optimization: delivery correctness never depends on cached counts. `Queue`
 defaults to `shared_stats_cache()` for SQLite backends so multiple queue names
-on the same database stay coherent. The `delivered` field counts delivery
-attempts (including redeliveries); `to_dict()` also exposes `delivery_attempts`
-with the same value. `current_depth` counts claimable messages; `scheduled_count`
-counts future-scheduled rows not yet due.
+on the same database stay coherent; pass `cache_ttl_seconds=` to `Queue(...)` or
+use `create_queue(config)` so `config.cache_ttl` is wired automatically. The
+`delivered` field counts delivery attempts (including redeliveries); `to_dict()`
+also exposes `delivery_attempts` with the same value. `current_depth` counts
+claimable messages; `scheduled_count` counts future-scheduled rows not yet due.
 
 ## Demos
 
@@ -359,3 +380,7 @@ Further notes live in `docs/`:
 - [docs/delivery_guarantees.md](docs/delivery_guarantees.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/state_transitions.md](docs/state_transitions.md)
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Princeton Afeez.
