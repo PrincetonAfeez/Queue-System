@@ -1,0 +1,12 @@
+""" Idempotency key generation. """
+
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+
+
+def payload_idempotency_key(payload: Any) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
