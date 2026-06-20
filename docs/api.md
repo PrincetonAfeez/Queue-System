@@ -23,7 +23,7 @@ Public exports from `simplequeue` (`__all__`):
 | `DeadLetterNotFound` | Invalid DLQ requeue target |
 | `StorageError` | Backend / serialization failures |
 | `payload_idempotency_key` | Derive key from payload hash |
-| `create_backend` | Build a `StorageBackend` from `QueueConfig` |
+| `create_backend` | Build a `StorageBackend` from `QueueConfig` (exported from `simplequeue`) |
 
 ## `list_dead_letters`
 
@@ -31,16 +31,22 @@ Public exports from `simplequeue` (`__all__`):
 - ``list_dead_letters("other")`` — dead letters for a named queue.
 - ``list_dead_letters(all_queues=True)`` — all unrequeued dead letters in the database.
 
+Passing both ``queue_name`` and ``all_queues=True`` raises ``ValueError``.
+
 ## `purge_terminal`
 
-``Queue.purge_terminal(older_than=...)`` deletes ``acked`` and ``deleted`` rows
-whose ``updated_at`` is on or before the cutoff. Use this to cap database growth
-in long-running deployments. Does not remove ``dead_lettered`` rows.
+``Queue.purge_terminal(older_than=...)`` deletes terminal rows on or before the
+cutoff. When ``older_than`` is omitted, the default retention is
+``DEFAULT_PURGE_RETENTION_DAYS`` (7 days) relative to the queue clock.
+
+Set ``include_dead_lettered=True`` to also remove old ``dead_lettered`` rows and
+their ``dead_letters`` records. CLI: ``simplequeue purge --older-than-days 7
+--include-dead-lettered``.
 
 ## `shared_stats_cache`
 
-Caches are keyed by ``(database_path, ttl_seconds)``. The ``clock`` from the
-first call for a key is retained; pass the same clock in tests.
+Caches are keyed by ``(database_path, ttl_seconds, id(clock))``. Pass the same
+clock object when sharing a cache in tests.
 
 ## CLI vs library time
 
@@ -77,7 +83,7 @@ returning `lease_expired`.
 | 2 | Config / validation (includes malformed JSON payload) |
 | 3 | Inspect miss |
 | 4 | `QueueError` (includes `IdempotencyConflict`, duplicate sweeper) |
-| 130 | Interrupted (Ctrl-C / SIGTERM) |
+| 130 | Interrupted (Ctrl-C; SIGTERM on Unix uses the same cleanup path) |
 
 ## Related docs
 
@@ -85,3 +91,4 @@ returning `lease_expired`.
 - [workers.md](workers.md)
 - [architecture.md](architecture.md)
 - [state_transitions.md](state_transitions.md)
+- [migrations.md](migrations.md)
