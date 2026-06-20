@@ -4,12 +4,34 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simplequeue-system"
-version = "0.1.0"
+version = "0.2.1"
 description = "A durable SQLite-backed queue library and CLI with at-most-once, at-least-once, retries, DLQ, and workers."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Queue System Library" }]
-license = { text = "MIT" }
+authors = [{ name = "Princeton Afeez" }]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = [
+  "queue",
+  "sqlite",
+  "message-queue",
+  "at-least-once",
+  "at-most-once",
+  "dead-letter-queue",
+  "worker",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: System :: Distributed Computing",
+  "Typing :: Typed",
+]
 dependencies = []
 
 [project.optional-dependencies]
@@ -23,6 +45,10 @@ dev = [
 
 [project.scripts]
 simplequeue = "simplequeue.cli.main:main"
+
+[project.urls]
+Repository = "https://github.com/PrincetonAfeez/Queue-System"
+Issues = "https://github.com/PrincetonAfeez/Queue-System/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -47,6 +73,7 @@ exclude_lines = [
 ]
 show_missing = true
 skip_covered = false
+fail_under = 95
 
 [tool.mypy]
 python_version = "3.11"
