@@ -1,7 +1,9 @@
-# Runtime: no third-party dependencies (Python 3.11+ stdlib only).
-# Installs the library and CLI in editable mode:
+# Runtime: zero third-party dependencies (Python 3.11+ stdlib only).
+#
+# Editable install of the library and `simplequeue` CLI:
 #   pip install -r requirements.txt
 #
-# For tests and coverage, use requirements-dev.txt instead:
+# For tests, coverage, mypy, and ruff, use requirements-dev.txt:
 #   pip install -r requirements-dev.txt
+
 -e .

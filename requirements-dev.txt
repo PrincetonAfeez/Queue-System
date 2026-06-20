@@ -1,5 +1,13 @@
-# Development: pinned test/type-check toolchain + editable install.
+# Development toolchain (pinned) + editable install.
+#
 #   pip install -r requirements-dev.txt
+#
+# Then run:
+#   pytest
+#   pytest --cov=simplequeue --cov-report=term-missing
+#   python -m mypy src
+#   ruff check src tests
+
 -r requirements.txt
 pytest==9.0.3
 pytest-cov==7.0.0
