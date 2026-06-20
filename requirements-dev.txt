@@ -1,0 +1,7 @@
+# Development: pinned test/type-check toolchain + editable install.
+#   pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==9.0.3
+pytest-cov==7.0.0
+mypy==2.1.0
+ruff==0.15.1
