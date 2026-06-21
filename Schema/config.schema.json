@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/queue-system/config.schema.json",
+  "title": "Queue System Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "queue_name": {
+      "type": "string",
+      "minLength": 1,
+      "default": "default"
+    },
+    "delivery_mode": {
+      "type": "string",
+      "enum": ["at-most-once", "at-least-once"],
+      "default": "at-least-once"
+    },
+    "visibility_timeout": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "default": 30.0
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 3
+    },
+    "backend": {
+      "type": "string",
+      "enum": ["sqlite"],
+      "default": "sqlite"
+    },
+    "worker_count": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "cache_ttl": {
+      "type": "number",
+      "minimum": 0,
+      "default": 1.0
+    },
+    "database_path": {
+      "type": "string",
+      "minLength": 1,
+      "default": "queue.db"
+    },
+    "logging_level": {
+      "type": "string",
+      "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+      "default": "INFO"
+    },
+    "sweeper_interval": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "default": 1.0
+    },
+    "poll_interval": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0.25
+    },
+    "idle_timeout": {
+      "type": "number",
+      "minimum": 0,
+      "default": 1.0
+    },
+    "shutdown_mode": {
+      "type": "string",
+      "enum": ["finish-current", "nack-current", "abandon-current"],
+      "default": "finish-current"
+    }
+  }
+}

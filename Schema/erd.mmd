@@ -1,0 +1,52 @@
+erDiagram
+    MESSAGES ||--o{ DEAD_LETTERS : "can create"
+    MESSAGES ||--o{ QUEUE_EVENTS : "records"
+
+    MESSAGES {
+        integer id PK
+        text queue_name
+        text payload
+        text status
+        integer attempts
+        integer max_attempts
+        text created_at
+        text updated_at
+        text available_at
+        text leased_at
+        text lease_expires_at
+        text acked_at
+        text dead_lettered_at
+        text deleted_at
+        text idempotency_key
+        text last_error
+        integer version
+        text receipt_handle
+        text worker_id
+        text delivery_mode
+        integer redeliveries
+    }
+
+    DEAD_LETTERS {
+        integer id PK
+        integer original_message_id FK
+        text queue_name
+        text payload
+        text failure_reason
+        integer attempts
+        text created_at
+        text dead_lettered_at
+        text final_status
+        text requeued_at
+        integer requeued_message_id FK
+    }
+
+    QUEUE_EVENTS {
+        integer id PK
+        text event_type
+        text queue_name
+        integer message_id FK
+        text worker_id
+        text receipt_handle_short
+        text details
+        text created_at
+    }

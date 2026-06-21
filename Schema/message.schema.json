@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/queue-system/message.schema.json",
+  "title": "Queue Message Payload",
+  "description": "A flexible JSON payload schema for messages accepted by the Queue System.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "job": { "type": ["string", "number", "integer"] },
+        "type": { "type": "string" },
+        "data": true
+      }
+    },
+    { "type": "array" },
+    { "type": "string" },
+    { "type": "number" },
+    { "type": "integer" },
+    { "type": "boolean" },
+    { "type": "null" }
+  ]
+}
