@@ -1,3 +1,5 @@
+"""Unsafe examples demonstrate failure tests."""
+
 from __future__ import annotations
 
 from simplequeue.teaching.unsafe_ack_by_message_id import demonstrate_stale_ack_corruption

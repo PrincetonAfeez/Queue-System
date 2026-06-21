@@ -21,6 +21,7 @@ from simplequeue.cli.commands import (
     purge,
     stats,
     sweep,
+    verify,
 )
 from simplequeue.cli.shutdown import install_graceful_shutdown_handlers
 from simplequeue.config import QueueConfig, _validate_ranges, load_config
@@ -75,6 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.register(subparsers, parents)
     dlq.register(subparsers, parents)
     purge.register(subparsers, parents)
+    verify.register(subparsers, parents)
     demo.register(subparsers, parents)
     return parser
 

@@ -1,3 +1,5 @@
+"""Public API tests."""
+
 from __future__ import annotations
 
 import importlib

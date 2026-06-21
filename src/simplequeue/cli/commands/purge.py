@@ -38,6 +38,11 @@ def register(subparsers: Any, parents: list[argparse.ArgumentParser]) -> None:
         action="store_true",
         help="also purge dead_lettered rows past the cutoff",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="count eligible rows without deleting",
+    )
     parser.set_defaults(handler=run)
 
 
@@ -68,11 +73,13 @@ def run(args: argparse.Namespace, config: QueueConfig) -> int:
     queue_names = queue.list_queues() if all_queues else [queue.queue_name]
     results: list[dict[str, Any]] = []
     removed_total = 0
+    dry_run = bool(getattr(args, "dry_run", False))
     for name in queue_names:
         removed = queue.purge_terminal(
             older_than=older_than,
             queue_name=name,
             include_dead_lettered=args.include_dead_lettered,
+            dry_run=dry_run,
         )
         removed_total += removed
         results.append({"queue": name, "removed": removed})
@@ -80,6 +87,7 @@ def run(args: argparse.Namespace, config: QueueConfig) -> int:
         {
             "queues": results,
             "removed_total": removed_total,
+            "dry_run": dry_run,
             "include_dead_lettered": args.include_dead_lettered,
             "older_than_days": args.older_than_days,
             "older_than": args.older_than,

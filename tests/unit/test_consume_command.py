@@ -1,3 +1,5 @@
+"""Consume command tests."""
+
 from __future__ import annotations
 
 import argparse

@@ -243,6 +243,7 @@ class Queue:
         queue_name: str | None = None,
         include_dead_lettered: bool = False,
         all_queues: bool = False,
+        dry_run: bool = False,
     ) -> int:
         """Delete terminal rows with ``updated_at`` (or ``dead_lettered_at``) on or before the cutoff.
 
@@ -251,6 +252,7 @@ class Queue:
         removed. Does not purge anything when the retention window is empty.
 
         Pass ``all_queues=True`` to purge every queue in the database file.
+        Pass ``dry_run=True`` to count eligible rows without deleting.
         """
         from simplequeue.defaults import DEFAULT_PURGE_RETENTION_DAYS
 
@@ -265,6 +267,7 @@ class Queue:
                     name,
                     older_than,
                     include_dead_lettered=include_dead_lettered,
+                    dry_run=dry_run,
                 )
             return removed_total
         target = self.queue_name if queue_name is None else validate_queue_name(queue_name)
@@ -272,6 +275,7 @@ class Queue:
             target,
             older_than,
             include_dead_lettered=include_dead_lettered,
+            dry_run=dry_run,
         )
 
     def _purge_terminal_queue(
@@ -280,13 +284,15 @@ class Queue:
         older_than: datetime,
         *,
         include_dead_lettered: bool,
+        dry_run: bool = False,
     ) -> int:
         removed = self.backend.purge_terminal_messages(
             queue_name,
             older_than,
             include_dead_lettered=include_dead_lettered,
+            dry_run=dry_run,
         )
-        if removed:
+        if removed and not dry_run:
             self.stats_cache.invalidate(queue_name)
         log_event(
             self.logger,
@@ -295,5 +301,6 @@ class Queue:
             removed=removed,
             older_than=older_than.isoformat(),
             include_dead_lettered=include_dead_lettered,
+            dry_run=dry_run,
         )
         return removed

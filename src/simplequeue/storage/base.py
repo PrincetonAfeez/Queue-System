@@ -92,5 +92,6 @@ class StorageBackend(ABC):
         older_than: datetime,
         *,
         include_dead_lettered: bool = False,
+        dry_run: bool = False,
     ) -> int:
         raise NotImplementedError

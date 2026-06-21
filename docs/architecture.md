@@ -68,6 +68,9 @@ raises `StorageError`.
 
 `Queue.purge_terminal()` removes old terminal rows (and optionally dead-letter
 records) on a retention cutoff. The CLI exposes this as `simplequeue purge`
-(with `--all-queues`, `--older-than`, and `--older-than-days`). `Queue.sweep()`
-reclaims expired leases and moves exhausted messages to the DLQ across the whole
+(with `--all-queues`, `--older-than`, `--older-than-days`, and `--dry-run`).
+Pass `--dry-run` to count eligible rows without deleting; the JSON output
+includes `"dry_run": true` and `"removed_total"` as the preview count. Live
+purge deletes immediately — use conservative retention windows and backups.
+`Queue.sweep()` reclaims expired leases and moves exhausted messages to the DLQ across the whole
 database file.

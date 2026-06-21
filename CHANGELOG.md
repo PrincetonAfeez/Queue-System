@@ -7,11 +7,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [0.2.1] - 2026-06-20
 
 ### Added
-- `tests/unit/test_maximum_coverage.py` — CLI, worker, and SQLite backend edge-case coverage.
+- `simplequeue verify` — SQLite integrity check, schema version validation, required tables, and safe row counts (exit **1** when unhealthy).
+- `VerifyResult` and `SQLiteBackend.verify_database()` for programmatic health checks.
 - `tests/unit/test_module_inventory.py` — parametrised import smoke tests for every package module, safe demos, and public API surfaces.
 - `tests/unit/test_storage_coverage_polish.py` — scoped lease release, redeliver events, purge scope, and validation helpers.
 - `tests/integration/test_sqlite_polish.py` — stale-receipt concurrency, DLQ sweep paths, and purge-with-DLQ integration cases.
 - README design-decisions section, CI/coverage badges, and `docs/api.md` input-bounds documentation.
+- `docs/security.md` — explicit security posture (auth, encryption, tenancy, network scope).
+- `docs/operations.md` — deployment and operating model; `scripts/run-worker.sh` and `scripts/run-worker.ps1` examples.
+- `simplequeue verify` — integrity check, schema version, and table readability (exit **1** when unhealthy).
+- `simplequeue purge --dry-run` — preview terminal-row deletions without removing data.
 
 ### Changed
 - Test suite expanded to **566** tests with **~99%** line coverage on `src/simplequeue`.

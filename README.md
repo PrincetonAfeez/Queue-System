@@ -3,7 +3,7 @@
 [![CI](https://github.com/PrincetonAfeez/Queue-System/actions/workflows/ci.yml/badge.svg)](https://github.com/PrincetonAfeez/Queue-System/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Version](https://img.shields.io/badge/version-0.2.1-green)
-![Tests](https://img.shields.io/badge/tests-566-blue)
+![Tests](https://img.shields.io/badge/tests-576-blue)
 ![Coverage](https://img.shields.io/badge/coverage-%7E99%25-brightgreen)
 
 A durable SQLite-backed queue library and CLI that demonstrates at-most-once delivery, at-least-once delivery, worker pools, visibility timeouts, retries, dead-letter handling, stats caching, and operational inspection.
@@ -33,7 +33,7 @@ python -m mypy src
 ruff check src tests
 ```
 
-The suite currently collects **566 tests** across unit, integration, CLI smoke,
+The suite currently collects **576 tests** across unit, integration, CLI smoke,
 worker, and concurrency modules.
 
 With dev dependencies installed, generate a coverage report (currently **~99%** line
@@ -51,6 +51,26 @@ pip install -r requirements-dev.txt
 
 Confirm the install with `simplequeue --version`.
 
+## Deployment / Operating Model
+
+**simplequeue** is not a hosted service and does not require Docker. Install
+locally with `pip install -r requirements.txt` or `pip install -e .`, initialize
+a database with `simplequeue init-db --db queue.db`, and run workers with
+`simplequeue consume` (or the helper scripts in `scripts/`).
+
+Operational essentials:
+
+- Run **`simplequeue sweep`** on a schedule, or pass **`--sweeper`** to
+  `consume` (at most **one** sweeper per SQLite database file).
+- **Back up** the `.db` file using normal SQLite backup practices.
+- **Upgrade** the package before resuming workers if the database schema is newer
+  than the library (see [docs/migrations.md](docs/migrations.md)).
+- Use your **host process manager**, Task Scheduler, systemd, or shell scripts for
+  long-running consumers.
+
+Full operating guidance — supervision, retention, library embedding, and
+packaging — is in [docs/operations.md](docs/operations.md).
+
 ## Tests
 
 The suite lives under `tests/` and is organized by concern:
@@ -65,7 +85,7 @@ The suite lives under `tests/` and is organized by concern:
 | `tests/teaching/` | Unsafe examples that demonstrate known failure modes |
 
 Shared fixtures (including a `queue_factory` for SQLite-backed queues) are in
-`tests/conftest.py`. Run `pytest --co -q` to list all collected tests (566 at
+`tests/conftest.py`. Run `pytest --co -q` to list all collected tests (576 at
 last count).
 
 ## CLI Quick Start
@@ -98,6 +118,8 @@ simplequeue list-queues --db queue.db
 simplequeue sweep --db queue.db --queue emails
 simplequeue dlq --db queue.db --queue emails
 simplequeue purge --db queue.db --queue emails --older-than-days 7
+simplequeue purge --db queue.db --queue emails --older-than-days 7 --dry-run
+simplequeue verify --db queue.db
 ```
 
 Every command supports `--help`, which lists all flags. The `consume` and
@@ -155,7 +177,7 @@ The CLI always uses wall-clock time (`SystemClock`). Inject `FakeClock` through
 | Code | Meaning |
 | ---- | ------- |
 | 0 | success |
-| 1 | unexpected runtime error (including storage/I/O failures) |
+| 1 | unexpected runtime error (including storage/I/O failures and **`verify` health-check failure**) |
 | 2 | usage or configuration error (bad arguments, invalid config file) |
 | 3 | `inspect` target message not found (or wrong queue scope) |
 | 4 | domain error (`QueueError`, including `IdempotencyConflict` and duplicate sweeper) |
@@ -345,18 +367,25 @@ demos always ignore `--db` and run in isolated teaching setups.
 ## Limitations
 
 - **Single SQLite writer** — throughput is capped by database-level write locks; see [docs/sqlite_atomic_claims.md](docs/sqlite_atomic_claims.md).
-- **Terminal row retention** — `acked` and `deleted` messages remain until you call `Queue.purge_terminal()` or `simplequeue purge`. By default the library keeps the last 7 days; pass `older_than` explicitly for custom retention. Use `--include-dead-lettered` / `include_dead_lettered=True` to prune old DLQ rows.
+- **Terminal row retention** — `acked` and `deleted` messages remain until you call `Queue.purge_terminal()` or `simplequeue purge`. By default the library keeps the last 7 days; pass `older_than` explicitly for custom retention. Use `--include-dead-lettered` / `include_dead_lettered=True` to prune old DLQ rows. Preview deletions with `simplequeue purge --dry-run` before running a live purge; take a database backup first.
 - **No network layer** — local library and CLI only; see Security below.
 
-## Security
+## Security Posture
 
-This is a local, single-trust library and CLI, not a networked service. It does
-not authenticate callers, authorize operations, or encrypt data at rest: the
-SQLite database is whatever path the caller supplies and is readable by anyone
-with filesystem access. All SQL uses parameterized queries (no string
-interpolation), so payloads cannot inject SQL, and payloads are stored as JSON
-and never evaluated. Treat the database file and message payloads as trusted,
-and protect them with filesystem permissions if needed.
+**simplequeue** is a local SQLite-backed library and CLI — not a networked,
+multi-tenant broker. It does **not** provide authentication, authorization,
+encryption at rest, secret management, tenant isolation, or network hardening.
+
+What it **does** do: parameterized SQL (no injection via payloads), JSON-only
+payload storage (never evaluated), and receipt-handle/lease guards on ack/nack.
+
+**Your responsibility:** filesystem permissions on the `.db` file, choosing
+trusted hosts, and not storing secrets in messages unless your environment
+already protects them. SQLite permissions follow the operating system; the
+library does not set file modes.
+
+Full details — including a capability matrix and recommended use cases — are in
+[docs/security.md](docs/security.md).
 
 ## Project Layout
 
@@ -379,6 +408,8 @@ Further notes live in `docs/`:
 - [docs/workers.md](docs/workers.md) — worker pools, shutdown, join semantics
 - [docs/delivery_guarantees.md](docs/delivery_guarantees.md)
 - [docs/architecture.md](docs/architecture.md)
+- [docs/security.md](docs/security.md) — threat model, what is and is not protected
+- [docs/operations.md](docs/operations.md) — deployment, workers, backup, upgrades
 - [docs/state_transitions.md](docs/state_transitions.md)
 
 ## License

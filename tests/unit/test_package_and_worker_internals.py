@@ -1,3 +1,5 @@
+"""Package and worker internals tests."""
+
 from __future__ import annotations
 
 import logging

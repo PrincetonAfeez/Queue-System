@@ -126,11 +126,23 @@ returning `lease_expired`.
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 1 | Storage / unexpected error |
+| 1 | Storage / unexpected error / **`verify` reported an unhealthy database** |
 | 2 | Config / validation (includes malformed JSON payload) |
 | 3 | Inspect miss |
 | 4 | `QueueError` (includes `IdempotencyConflict`, duplicate sweeper) |
 | 130 | Interrupted (Ctrl-C; SIGTERM on Unix uses the same cleanup path) |
+
+### `verify`
+
+```powershell
+simplequeue verify --db queue.db
+```
+
+Runs `PRAGMA integrity_check`, `PRAGMA foreign_key_check`, confirms required
+tables (`schema_meta`, `messages`, `dead_letters`, `queue_events`), checks
+`schema_meta.version` against the library, and reads row counts. Prints JSON
+with `"healthy": true` and exits **0** when all checks pass; exits **1** when
+any check fails (details in `"errors"`).
 
 ## Related docs
 

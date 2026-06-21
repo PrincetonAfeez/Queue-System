@@ -1,3 +1,5 @@
+"""CLI coverage gaps tests."""
+
 from __future__ import annotations
 
 import argparse

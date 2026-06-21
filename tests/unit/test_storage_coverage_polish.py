@@ -1,3 +1,5 @@
+"""Storage coverage polish tests."""
+
 from __future__ import annotations
 
 from contextlib import closing

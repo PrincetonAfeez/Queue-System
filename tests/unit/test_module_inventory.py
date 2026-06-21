@@ -1,3 +1,5 @@
+"""Module inventory tests."""
+
 from __future__ import annotations
 
 import importlib
@@ -225,6 +227,7 @@ def test_cli_command_modules_expose_register_and_run() -> None:
         purge,
         stats,
         sweep,
+        verify,
     )
 
     for module in (
@@ -239,6 +242,7 @@ def test_cli_command_modules_expose_register_and_run() -> None:
         purge,
         stats,
         sweep,
+        verify,
     ):
         assert callable(module.register)
     assert callable(consume.run)
@@ -266,6 +270,7 @@ def test_build_parser_registers_every_command() -> None:
         "inspect",
         "dlq",
         "purge",
+        "verify",
         "demo",
     }
 

@@ -15,7 +15,13 @@ from simplequeue.core.delivery import Delivery
 from simplequeue.core.exceptions import DeadLetterNotFound, IdempotencyConflict, StorageError
 from simplequeue.core.message import DeadLetter, Message, MessageDetails, QueueEvent
 from simplequeue.core.modes import DeliveryMode
-from simplequeue.core.results import AckResult, ClaimResult, LeaseReleaseResult, NackResult
+from simplequeue.core.results import (
+    AckResult,
+    ClaimResult,
+    LeaseReleaseResult,
+    NackResult,
+    VerifyResult,
+)
 from simplequeue.core.states import MessageStatus, assert_legal_transition
 from simplequeue.core.validation import validate_queue_name
 from simplequeue.observability import events
@@ -25,11 +31,18 @@ from simplequeue.reliability.leases import lease_is_active
 from simplequeue.reliability.receipt_handles import new_receipt_handle
 from simplequeue.reliability.retry import decide_retry
 from simplequeue.storage.base import StorageBackend
-from simplequeue.storage.migrations import apply_schema_version, load_schema_sql
+from simplequeue.storage.migrations import SCHEMA_VERSION, apply_schema_version, load_schema_sql
 from simplequeue.storage.serializers import dumps, loads
 
 # Bounded retries on idempotency-key races; see docs/migrations.md for concurrency notes.
 IDEMPOTENCY_ENQUEUE_MAX_RETRIES = 25
+
+_REQUIRED_VERIFY_TABLES: tuple[str, ...] = (
+    "schema_meta",
+    "messages",
+    "dead_letters",
+    "queue_events",
+)
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -121,6 +134,98 @@ class SQLiteBackend(StorageBackend):
             except BaseException:
                 conn.rollback()
                 raise
+
+    def verify_database(self) -> VerifyResult:
+        """Read-only health check: integrity, schema, tables, and safe row counts."""
+        db_path = str(self.db_path)
+        if not self.db_path.exists():
+            return VerifyResult(
+                healthy=False,
+                db_path=db_path,
+                integrity_check="skipped",
+                foreign_key_check_ok=False,
+                schema_version=None,
+                expected_schema_version=SCHEMA_VERSION,
+                schema_consistent=False,
+                tables={name: False for name in _REQUIRED_VERIFY_TABLES},
+                row_counts={},
+                errors=("database file does not exist",),
+            )
+        errors: list[str] = []
+        integrity_check = "unknown"
+        foreign_key_check_ok = False
+        schema_version: int | None = None
+        schema_consistent = False
+        tables: dict[str, bool] = {name: False for name in _REQUIRED_VERIFY_TABLES}
+        row_counts: dict[str, int] = {}
+        try:
+            with closing(self._connect()) as conn:
+                integrity_check = str(conn.execute("PRAGMA integrity_check").fetchone()[0])
+                if integrity_check != "ok":
+                    errors.append(f"integrity_check: {integrity_check}")
+
+                fk_violations = conn.execute("PRAGMA foreign_key_check").fetchall()
+                foreign_key_check_ok = len(fk_violations) == 0
+                if not foreign_key_check_ok:
+                    errors.append(f"foreign_key_check: {len(fk_violations)} violation(s)")
+
+                for table in _REQUIRED_VERIFY_TABLES:
+                    present = (
+                        conn.execute(
+                            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+                            (table,),
+                        ).fetchone()
+                        is not None
+                    )
+                    tables[table] = present
+                    if not present:
+                        errors.append(f"missing table: {table}")
+                        continue
+                    try:
+                        row_counts[table] = int(
+                            conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                        )
+                    except sqlite3.Error as error:
+                        errors.append(f"cannot read table {table}: {error}")
+
+                if tables["schema_meta"]:
+                    version_row = conn.execute(
+                        "SELECT value FROM schema_meta WHERE key = 'version'"
+                    ).fetchone()
+                    if version_row is None:
+                        errors.append("schema_meta missing 'version' key")
+                    else:
+                        schema_version = int(str(version_row["value"]))
+                        if schema_version > SCHEMA_VERSION:
+                            errors.append(
+                                "schema version "
+                                f"{schema_version} is newer than library {SCHEMA_VERSION}; "
+                                "upgrade the simplequeue package"
+                            )
+                        elif schema_version < SCHEMA_VERSION:
+                            errors.append(
+                                "schema version "
+                                f"{schema_version} is older than library {SCHEMA_VERSION}; "
+                                "run init-db or upgrade the package"
+                            )
+                        else:
+                            schema_consistent = True
+        except sqlite3.Error as error:
+            errors.append(str(error))
+            integrity_check = "failed"
+
+        return VerifyResult(
+            healthy=not errors,
+            db_path=db_path,
+            integrity_check=integrity_check,
+            foreign_key_check_ok=foreign_key_check_ok,
+            schema_version=schema_version,
+            expected_schema_version=SCHEMA_VERSION,
+            schema_consistent=schema_consistent,
+            tables=tables,
+            row_counts=row_counts,
+            errors=tuple(errors),
+        )
 
     @_wrap_storage_errors
     def enqueue(
@@ -861,52 +966,56 @@ class SQLiteBackend(StorageBackend):
         older_than: datetime,
         *,
         include_dead_lettered: bool = False,
+        dry_run: bool = False,
     ) -> int:
         queue_name = validate_queue_name(queue_name)
         with closing(self._connect()) as conn:
-            conn.execute("BEGIN IMMEDIATE")
-            try:
-                removed = 0
-                rows = conn.execute(
+            terminal_rows = conn.execute(
+                """
+                SELECT id FROM messages
+                WHERE queue_name = ?
+                  AND status IN (?, ?)
+                  AND updated_at <= ?
+                """,
+                (
+                    queue_name,
+                    MessageStatus.ACKED.value,
+                    MessageStatus.DELETED.value,
+                    _dt(older_than),
+                ),
+            ).fetchall()
+            dlq_rows: list[sqlite3.Row] = []
+            if include_dead_lettered:
+                dlq_rows = conn.execute(
                     """
                     SELECT id FROM messages
                     WHERE queue_name = ?
-                      AND status IN (?, ?)
-                      AND updated_at <= ?
+                      AND status = ?
+                      AND dead_lettered_at IS NOT NULL
+                      AND dead_lettered_at <= ?
                     """,
                     (
                         queue_name,
-                        MessageStatus.ACKED.value,
-                        MessageStatus.DELETED.value,
+                        MessageStatus.DEAD_LETTERED.value,
                         _dt(older_than),
                     ),
                 ).fetchall()
-                for row in rows:
+            if dry_run:
+                return len(terminal_rows) + len(dlq_rows)
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                removed = 0
+                for row in terminal_rows:
                     if self._purge_message_locked(conn, int(row["id"])):
                         removed += 1
-                if include_dead_lettered:
-                    dlq_rows = conn.execute(
-                        """
-                        SELECT id FROM messages
-                        WHERE queue_name = ?
-                          AND status = ?
-                          AND dead_lettered_at IS NOT NULL
-                          AND dead_lettered_at <= ?
-                        """,
-                        (
-                            queue_name,
-                            MessageStatus.DEAD_LETTERED.value,
-                            _dt(older_than),
-                        ),
-                    ).fetchall()
-                    for row in dlq_rows:
-                        message_id = int(row["id"])
-                        conn.execute(
-                            "DELETE FROM dead_letters WHERE original_message_id = ?",
-                            (message_id,),
-                        )
-                        if self._purge_message_locked(conn, message_id):
-                            removed += 1
+                for row in dlq_rows:
+                    message_id = int(row["id"])
+                    conn.execute(
+                        "DELETE FROM dead_letters WHERE original_message_id = ?",
+                        (message_id,),
+                    )
+                    if self._purge_message_locked(conn, message_id):
+                        removed += 1
                 conn.commit()
                 return removed
             except BaseException:

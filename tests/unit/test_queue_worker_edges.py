@@ -1,3 +1,5 @@
+"""Queue and worker edges tests."""
+
 from __future__ import annotations
 
 import logging
@@ -105,6 +107,7 @@ class InMemoryBackend(StorageBackend):
         older_than: datetime,
         *,
         include_dead_lettered: bool = False,
+        dry_run: bool = False,
     ) -> int:
         return 0
 
