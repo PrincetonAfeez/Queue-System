@@ -17,6 +17,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `docs/operations.md` — deployment and operating model; `scripts/run-worker.sh` and `scripts/run-worker.ps1` examples.
 - `simplequeue verify` — integrity check, schema version, and table readability (exit **1** when unhealthy).
 - `simplequeue purge --dry-run` — preview terminal-row deletions without removing data.
+- Live purge selects deletion candidates inside `BEGIN IMMEDIATE` and guards deletes by terminal status.
 
 ### Changed
 - Test suite expanded to **566** tests with **~99%** line coverage on `src/simplequeue`.

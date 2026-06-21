@@ -74,3 +74,45 @@ def test_purge_cli_dry_run_leaves_rows(queue_factory, tmp_path, capsys) -> None:
     assert payload["dry_run"] is True
     assert payload["removed_total"] == 1
     assert queue.inspect(message_id) is not None
+
+
+def test_purge_revalidates_dead_letter_status_before_delete(queue_factory) -> None:
+    from simplequeue.core.states import MessageStatus
+
+    clock = FakeClock.starting_at(datetime(2026, 1, 1, tzinfo=UTC))
+    queue = queue_factory("purge-requeue-race", clock=clock)
+    message_id = queue.enqueue({"x": 1}, max_attempts=1)
+    delivery = queue.dequeue(worker_id="w")
+    assert delivery is not None
+    queue.nack(delivery.receipt_handle, reason="fail")
+    queue.requeue_dead_letter(message_id)
+    removed = queue.purge_terminal(
+        older_than=clock.now(),
+        include_dead_lettered=True,
+        dry_run=False,
+    )
+    assert removed == 0
+    details = queue.inspect(message_id)
+    assert details is not None
+    assert details.message.status is MessageStatus.AVAILABLE
+
+
+def test_purge_status_guard_skips_non_terminal_message(tmp_path) -> None:
+    from contextlib import closing
+
+    from simplequeue.core.states import MessageStatus
+    from simplequeue.storage.sqlite_backend import SQLiteBackend
+
+    backend = SQLiteBackend(tmp_path / "purge-guard.db")
+    backend.init_schema()
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    message_id = backend.enqueue("q", {"x": 1}, now=now)
+    with closing(backend._connect()) as conn:  # noqa: SLF001
+        conn.execute("BEGIN IMMEDIATE")
+        assert not backend._purge_message_locked(  # noqa: SLF001
+            conn,
+            message_id,
+            expected_statuses=(MessageStatus.DEAD_LETTERED.value,),
+        )
+        conn.rollback()
+    assert backend.inspect(message_id) is not None

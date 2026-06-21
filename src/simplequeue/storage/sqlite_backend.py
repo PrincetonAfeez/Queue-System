@@ -970,64 +970,125 @@ class SQLiteBackend(StorageBackend):
     ) -> int:
         queue_name = validate_queue_name(queue_name)
         with closing(self._connect()) as conn:
-            terminal_rows = conn.execute(
-                """
-                SELECT id FROM messages
-                WHERE queue_name = ?
-                  AND status IN (?, ?)
-                  AND updated_at <= ?
-                """,
-                (
-                    queue_name,
-                    MessageStatus.ACKED.value,
-                    MessageStatus.DELETED.value,
-                    _dt(older_than),
-                ),
-            ).fetchall()
-            dlq_rows: list[sqlite3.Row] = []
-            if include_dead_lettered:
-                dlq_rows = conn.execute(
-                    """
-                    SELECT id FROM messages
-                    WHERE queue_name = ?
-                      AND status = ?
-                      AND dead_lettered_at IS NOT NULL
-                      AND dead_lettered_at <= ?
-                    """,
-                    (
-                        queue_name,
-                        MessageStatus.DEAD_LETTERED.value,
-                        _dt(older_than),
-                    ),
-                ).fetchall()
             if dry_run:
-                return len(terminal_rows) + len(dlq_rows)
+                terminal_count = int(
+                    conn.execute(
+                        """
+                        SELECT COUNT(*) AS count FROM messages
+                        WHERE queue_name = ?
+                          AND status IN (?, ?)
+                          AND updated_at <= ?
+                        """,
+                        (
+                            queue_name,
+                            MessageStatus.ACKED.value,
+                            MessageStatus.DELETED.value,
+                            _dt(older_than),
+                        ),
+                    ).fetchone()["count"]
+                )
+                dlq_count = 0
+                if include_dead_lettered:
+                    dlq_count = int(
+                        conn.execute(
+                            """
+                            SELECT COUNT(*) AS count FROM messages
+                            WHERE queue_name = ?
+                              AND status = ?
+                              AND dead_lettered_at IS NOT NULL
+                              AND dead_lettered_at <= ?
+                            """,
+                            (
+                                queue_name,
+                                MessageStatus.DEAD_LETTERED.value,
+                                _dt(older_than),
+                            ),
+                        ).fetchone()["count"]
+                    )
+                return terminal_count + dlq_count
+
             conn.execute("BEGIN IMMEDIATE")
             try:
                 removed = 0
+                terminal_rows = conn.execute(
+                    """
+                    SELECT id FROM messages
+                    WHERE queue_name = ?
+                      AND status IN (?, ?)
+                      AND updated_at <= ?
+                    """,
+                    (
+                        queue_name,
+                        MessageStatus.ACKED.value,
+                        MessageStatus.DELETED.value,
+                        _dt(older_than),
+                    ),
+                ).fetchall()
                 for row in terminal_rows:
-                    if self._purge_message_locked(conn, int(row["id"])):
+                    if self._purge_message_locked(
+                        conn,
+                        int(row["id"]),
+                        expected_statuses=(
+                            MessageStatus.ACKED.value,
+                            MessageStatus.DELETED.value,
+                        ),
+                    ):
                         removed += 1
-                for row in dlq_rows:
-                    message_id = int(row["id"])
-                    conn.execute(
-                        "DELETE FROM dead_letters WHERE original_message_id = ?",
-                        (message_id,),
-                    )
-                    if self._purge_message_locked(conn, message_id):
-                        removed += 1
+                if include_dead_lettered:
+                    dlq_rows = conn.execute(
+                        """
+                        SELECT id FROM messages
+                        WHERE queue_name = ?
+                          AND status = ?
+                          AND dead_lettered_at IS NOT NULL
+                          AND dead_lettered_at <= ?
+                        """,
+                        (
+                            queue_name,
+                            MessageStatus.DEAD_LETTERED.value,
+                            _dt(older_than),
+                        ),
+                    ).fetchall()
+                    for row in dlq_rows:
+                        message_id = int(row["id"])
+                        if self._purge_message_locked(
+                            conn,
+                            message_id,
+                            expected_statuses=(MessageStatus.DEAD_LETTERED.value,),
+                            delete_dead_letter_row=True,
+                        ):
+                            removed += 1
                 conn.commit()
                 return removed
             except BaseException:
                 conn.rollback()
                 raise
 
-    def _purge_message_locked(self, conn: sqlite3.Connection, message_id: int) -> bool:
+    def _purge_message_locked(
+        self,
+        conn: sqlite3.Connection,
+        message_id: int,
+        *,
+        expected_statuses: tuple[str, ...] | None = None,
+        delete_dead_letter_row: bool = False,
+    ) -> bool:
         conn.execute(
             "DELETE FROM queue_events WHERE message_id = ?",
             (message_id,),
         )
-        cur = conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        if delete_dead_letter_row:
+            conn.execute(
+                "DELETE FROM dead_letters WHERE original_message_id = ?",
+                (message_id,),
+            )
+        if expected_statuses is None:
+            cur = conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        else:
+            placeholders = ", ".join("?" for _ in expected_statuses)
+            cur = conn.execute(
+                f"DELETE FROM messages WHERE id = ? AND status IN ({placeholders})",
+                (message_id, *expected_statuses),
+            )
         return cur.rowcount == 1
 
     def _release_expired_leases_locked(

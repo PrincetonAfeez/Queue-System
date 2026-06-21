@@ -71,6 +71,9 @@ records) on a retention cutoff. The CLI exposes this as `simplequeue purge`
 (with `--all-queues`, `--older-than`, `--older-than-days`, and `--dry-run`).
 Pass `--dry-run` to count eligible rows without deleting; the JSON output
 includes `"dry_run": true` and `"removed_total"` as the preview count. Live
-purge deletes immediately — use conservative retention windows and backups.
+purge runs candidate selection inside `BEGIN IMMEDIATE` and deletes only rows
+that still match the expected terminal status at deletion time, so a concurrent
+requeue cannot remove a live message. Live purge deletes immediately — use
+conservative retention windows and backups.
 `Queue.sweep()` reclaims expired leases and moves exhausted messages to the DLQ across the whole
 database file.
